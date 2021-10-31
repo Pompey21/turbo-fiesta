@@ -290,7 +290,7 @@ def sort_alphabetically(system):
     ordered = collections.OrderedDict(sorted(system.items()))
     return ordered
 
-def generate_output(system):
+def generate_output_index(system):
     system = sort_alphabetically(system)
     output = open("index.txt", "w+")
     head = list(system.keys())[0]
@@ -434,47 +434,10 @@ def prepare_compound_queries(compound_query):
 # --------------------------------------------------------------------------
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # *******************************************
-# Preparing Queries
+# Search Files for Queries
 # *******************************************
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # --------------------------------------------------------------------------
-
-
-# Filter Stage 1
-def is_one_word(query):
-    query = query.lower()
-    lst_words = query.split(' ')
-    for word in lst_words:
-        if word in ['and','or']:
-            return False
-    return True
-
-
-
-
-
-
-
-
-
-
-
-
-def is_word(elem):
-    for char in elem:
-        if char.isalpha():
-            return True
-
-def get_files(dict_docs):
-    files = flatten1(docID_docPosition(dict_docs))
-    return files
-
-def flatten1(t):
-    return [item for sublist in t for item in sublist]
-
-def flatten2(t):
-    return t[0]
-
 def search_files_word(word,system):
     # search for word in the system
     files = []
@@ -526,7 +489,33 @@ def search_files_proximity(proximity,system):
                     results.append(doc1[0])
     return results
 
+# ----------------------------------
+# **********************
+# Helper Functions
+# **********************
+# ----------------------------------
+def is_word(elem):
+    for char in elem:
+        if char.isalpha():
+            return True
 
+def get_files(dict_docs):
+    files = flatten1(docID_docPosition(dict_docs))
+    return files
+
+def flatten1(t):
+    return [item for sublist in t for item in sublist]
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Generate Results for Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 def get_result(query,system):
     flag_phrase = len(query) == 2
     flag_proximity = len(query) == 3
@@ -568,25 +557,21 @@ def compound_query_results(compound_query_prepared,system):
     else:
         result = []
     return result
-
-# ---------------------------------------------------------------------
-def filter_queries(queries):
-    one_word = [query for query in queries if is_one_word(query)]
-    # print('One word only:')
-    # print(one_word)
-
-    # this order must stay like this, else proximities are not generated
-    words = [query for query in one_word if not is_phrase(query)]
-    phrases = [prepare_phrase(query) for query in one_word if is_phrase(query)]
-    proximities = [prepare_proximity(query) for query in words if is_proximity(query)]
-    words = [query for query in words if not is_proximity(query)]
-
-#===========================================================================================
-    comp_queries = [query for query in queries if not is_one_word(query)]
-    comp_queries = [prepare_compound_queries(query) for query in comp_queries]
-
-    return words, phrases, proximities, comp_queries
-
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Execute Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 def execute_query(query,system):
     # check is it is a singular or a compound query
     single_query = is_single_query(query)
@@ -610,8 +595,10 @@ def execute_query(query,system):
         comp_query_result = list(compound_query_results(prepared_compound_query,system))
         return comp_query_result
 
-# ---------------------------------------------------------------------
-
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 # --------------------------------------------------------------------------
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # *******************************************
@@ -632,12 +619,25 @@ def process_querries(file_name,system):
 
     results = [execute_query(query,system) for query in queries]
     print(results)
+    return results
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Generate Output
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+def generate_output_queries(queries_results):
+    output = open("results.boolean.txt", "w+")
+    for i in range(0,len(queries_results)):
+        for sub_result in queries_results[i]:
+            output.write(str(i) + ',' + str(sub_result) + '\n')
 
-
-    # words, phrases, proximities, comp_queries = filter_queries(queries)
-    # print(queries)
-    # return words, phrases, proximities, comp_queries
-
+# + str(sub_result[i])
 
 #===========================================================================
 #< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
@@ -658,12 +658,14 @@ def main(name_of_file):
     system = master_indexing(tree)
 
     print('Generating output:')
-    generate_output(system)
+    generate_output_index(system)
 
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    process_querries('queries.txt',system)
+    results = process_querries('queries.txt',system)
+    generate_output_queries(results)
+
 
     #=========================================================================
     # SEARCHING

@@ -354,34 +354,44 @@ def lst_queries(queries):
 # <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # --------------------------------------------------------------------------
-
-
-
-
-
-
-# Filter Stage 1
-def is_one_word(query):
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Classifying Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+def is_single_query(query):
     query = query.lower()
     lst_words = query.split(' ')
     for word in lst_words:
-        if word in ['and','or']:
+        if word in ['and', 'or']:
             return False
     return True
 
-# Filter Stage 2
 def is_phrase(query):
     if query[0] == '"':
         return True
 
+def is_proximity(query):
+    if query[0] == '#':
+        return True
+
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Preparing Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 def prepare_phrase(phrase):
     phrase = re.split('[^a-zA-Z0-9]+', phrase)
     phrase = [elem for elem in phrase if elem != '']
     return phrase
-
-def is_proximity(query):
-    if query[0] == '#':
-        return True
 
 def prepare_proximity(proximity):
     triple = re.split('[^a-zA-Z0-9]+', proximity)
@@ -403,7 +413,7 @@ def is_OR(compound_query):
         if word == 'or':
             return True
 
-def compound_queries(compound_query):
+def prepare_compound_queries(compound_query):
     compound_query = compound_query.lower()
     flag_AND = is_AND(compound_query)
     flag_OR = is_OR(compound_query)
@@ -417,6 +427,38 @@ def compound_queries(compound_query):
         query = [elem for elem in query if is_word(elem)]
         query = [query[0], 'or', query[1]]
         return query
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Preparing Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+
+
+# Filter Stage 1
+def is_one_word(query):
+    query = query.lower()
+    lst_words = query.split(' ')
+    for word in lst_words:
+        if word in ['and','or']:
+            return False
+    return True
+
+
+
+
+
+
+
+
+
+
+
 
 def is_word(elem):
     for char in elem:
@@ -527,7 +569,7 @@ def compound_query_results(compound_query_prepared,system):
         result = []
     return result
 
-
+# ---------------------------------------------------------------------
 def filter_queries(queries):
     one_word = [query for query in queries if is_one_word(query)]
     # print('One word only:')
@@ -541,11 +583,41 @@ def filter_queries(queries):
 
 #===========================================================================================
     comp_queries = [query for query in queries if not is_one_word(query)]
-    comp_queries = [compound_queries(query) for query in comp_queries]
+    comp_queries = [prepare_compound_queries(query) for query in comp_queries]
 
     return words, phrases, proximities, comp_queries
 
-def preprocess_querries(file_name):
+def execute_query(query,system):
+    # check is it is a singular or a compound query
+    single_query = is_single_query(query)
+    # Singular:
+    if single_query:
+        if is_phrase(query):
+            phrase_prepared = prepare_phrase(query)
+            phrase_result = search_files_phrase(phrase_prepared,system)
+            return phrase_result
+        elif is_proximity(query):
+            proximity_prepared = prepare_proximity(query)
+            proximity_result = search_files_proximity(proximity_prepared, system)
+            return proximity_result
+        else:
+            word_prepared = query
+            return query
+    # Compound:
+    else:
+        prepared_compound_query = prepare_compound_queries(query)
+        return []
+
+# ---------------------------------------------------------------------
+
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
+# Process Queries
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+def process_querries(file_name,system):
     queries = read_bool_queries(file_name)
     print('-------------------------------')
     print('Printing queries: ')
@@ -556,11 +628,13 @@ def preprocess_querries(file_name):
     print(queries)
     print('-------------------------------')
 
+    results = [execute_query(query,system) for query in queries]
+    print(results)
 
 
-    words, phrases, proximities, comp_queries = filter_queries(queries)
+    # words, phrases, proximities, comp_queries = filter_queries(queries)
     # print(queries)
-    return words, phrases, proximities, comp_queries
+    # return words, phrases, proximities, comp_queries
 
 
 #===========================================================================
@@ -587,47 +661,49 @@ def main(name_of_file):
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
+    process_querries('queries.txt',system)
+
     #=========================================================================
     # SEARCHING
     #=========================================================================
-    words, phrases, proximities, comp_queries = preprocess_querries('queries.txt')
-    print('Processing the queries: ')
-    print('Compounded Queries: ')
-    print(comp_queries)
-    print('Words: ')
-    print(words)
-    print('Phrases: ')
-    print(phrases)
-    print('Proximities: ')
-    print(proximities)
-
-    results_words = flatten1([get_result(word,system) for word in words])
-    print('\n')
-    print('These are the results for singular queries - words: ')
-    print(results_words)
-    print('\n')
-
-    results_phrases = [get_result(phrase, system) for phrase in phrases]
-    print('\n')
-    print('These are the results for singular queries - phrases: ')
-    print(results_phrases)
-    print('\n')
-
-    results_proximities = [get_result(proxy, system) for proxy in proximities]
-    print('\n')
-    print('These are the results for singular queries - proximities: ')
-    print(results_proximities)
-    print('\n')
-
-    print('Compound queries: ')
-    print(comp_queries)
-    reuslts_compound_queries = [compound_query_results(comp_query, system) for comp_query in comp_queries]
-    print('\n')
-    print('These are the results for comp queries: ')
-    print(reuslts_compound_queries)
-    print('\n')
-
-    print(system)
+    # words, phrases, proximities, comp_queries = preprocess_querries('queries.txt')
+    # print('Processing the queries: ')
+    # print('Compounded Queries: ')
+    # print(comp_queries)
+    # print('Words: ')
+    # print(words)
+    # print('Phrases: ')
+    # print(phrases)
+    # print('Proximities: ')
+    # print(proximities)
+    #
+    # results_words = flatten1([get_result(word,system) for word in words])
+    # print('\n')
+    # print('These are the results for singular queries - words: ')
+    # print(results_words)
+    # print('\n')
+    #
+    # results_phrases = [get_result(phrase, system) for phrase in phrases]
+    # print('\n')
+    # print('These are the results for singular queries - phrases: ')
+    # print(results_phrases)
+    # print('\n')
+    #
+    # results_proximities = [get_result(proxy, system) for proxy in proximities]
+    # print('\n')
+    # print('These are the results for singular queries - proximities: ')
+    # print(results_proximities)
+    # print('\n')
+    #
+    # print('Compound queries: ')
+    # print(comp_queries)
+    # reuslts_compound_queries = [compound_query_results(comp_query, system) for comp_query in comp_queries]
+    # print('\n')
+    # print('These are the results for comp queries: ')
+    # print(reuslts_compound_queries)
+    # print('\n')
+    #
+    # print(system)
 
 
 

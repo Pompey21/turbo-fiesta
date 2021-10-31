@@ -324,11 +324,13 @@ def read_data_to_memory(file_name):
 #===========================================================================
 # QUERY PROCESSING
 #===========================================================================
-# ---------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# *******************************************
 # Boolean Search
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ---------------------------------------
+# *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 # parsing the boolean queries
 def read_bool_queries(file_name):
     file_queries = open(file_name, 'r')
@@ -348,6 +350,15 @@ def lst_queries(queries):
         cnt = len(str(i+1))
         queries_lst.append(queries[i][cnt+1:-1])
     return queries_lst
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
+
+
+
+
+
 
 # Filter Stage 1
 def is_one_word(query):
@@ -363,6 +374,11 @@ def is_phrase(query):
     if query[0] == '"':
         return True
 
+def prepare_phrase(phrase):
+    phrase = re.split('[^a-zA-Z0-9]+', phrase)
+    phrase = [elem for elem in phrase if elem != '']
+    return phrase
+
 def is_proximity(query):
     if query[0] == '#':
         return True
@@ -372,11 +388,6 @@ def prepare_proximity(proximity):
     triple = [elem for elem in triple if elem != '']
     print(triple)
     return triple
-
-def prepare_phrase(phrase):
-    phrase = re.split('[^a-zA-Z0-9]+', phrase)
-    phrase = [elem for elem in phrase if elem != '']
-    return phrase
 
 def is_AND(compound_query):
     compound_query = compound_query.lower()
@@ -539,12 +550,14 @@ def preprocess_querries(file_name):
     print('-------------------------------')
     print('Printing queries: ')
     print(queries)
-    # queries = [get_rid_of_number(query) for query in queries]
     print('-------------------------------')
     print('Printing list of queries')
     queries = lst_queries(queries)
     print(queries)
     print('-------------------------------')
+
+
+
     words, phrases, proximities, comp_queries = filter_queries(queries)
     # print(queries)
     return words, phrases, proximities, comp_queries

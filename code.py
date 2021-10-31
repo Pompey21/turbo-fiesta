@@ -602,11 +602,13 @@ def execute_query(query,system):
             return proximity_result
         else:
             word_prepared = query
-            return query
+            word_results = search_files_word(word_prepared, system)
+            return word_results
     # Compound:
     else:
         prepared_compound_query = prepare_compound_queries(query)
-        return []
+        comp_query_result = list(compound_query_results(prepared_compound_query,system))
+        return comp_query_result
 
 # ---------------------------------------------------------------------
 

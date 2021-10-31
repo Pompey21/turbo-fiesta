@@ -118,8 +118,6 @@ def preprocess(tree):
                         child.text = transporter + child.text
                     # print(child.text)
     return tree
-
-
 #===========================================================================
 #< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
 #===========================================================================
@@ -132,7 +130,6 @@ def preprocess(tree):
 """
 def vocab_generator(tree):
     vocabulary = set()
-
     for elem in tree.iter():
         if elem.tag == 'DOC':
             children = list(elem)
@@ -187,7 +184,6 @@ def invert_index_sparse_rep(df):
     return invert_indices
 
 def invert_index_advanced(invert_indices, child_text, vocabulary):
-
     # this is a dictionary for easier search
     doc_word_pos = [doc_word_positions(text, vocabulary) for text in child_text]
     new_invert_indices = {v: [] for v in vocabulary}
@@ -316,11 +312,11 @@ def generate_output_index(system):
                     if i != len(format_lst[j])-1:
                         output.write(',')
 
-#===========================================================================
-# LOAD DATA INTO MEMORY
-#===========================================================================
-def read_data_to_memory(file_name):
-    pass
+# #===========================================================================
+# # LOAD DATA INTO MEMORY
+# #===========================================================================
+# def read_data_to_memory(file_name):
+#     pass
 #===========================================================================
 # QUERY PROCESSING
 #===========================================================================
@@ -636,8 +632,11 @@ def generate_output_queries(queries_results):
     for i in range(0,len(queries_results)):
         for sub_result in queries_results[i]:
             output.write(str(i) + ',' + str(sub_result) + '\n')
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# --------------------------------------------------------------------------
 
-# + str(sub_result[i])
 
 #===========================================================================
 #< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >

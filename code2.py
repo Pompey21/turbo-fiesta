@@ -115,6 +115,48 @@ def generate_index_file(index):
 #===========================================================================
 #< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
 #===========================================================================
+"""
+    Helper Functions
+"""
+def get_files(dict_docs):
+    files = flatten1(docID_docPosition(dict_docs))
+    return files
+def flatten1(t):
+    return [item for sublist in t for item in sublist]
+def docID_docPosition(word_values):
+    docIDs = word_values.keys()
+    format = []
+    for id in docIDs:
+        id_num = int(id)
+        pos_lst = word_values.get(id)
+        format_lst = [[id_num, pos] for pos in pos_lst]
+        format.append(format_lst)
+    return format
+"""
+    Parsing & Preprocessing Queries
+"""
+def read_bool_queries(file_name):
+    file_queries = open(file_name, 'r')
+    bool_queries = file_queries.readlines()
+    return bool_queries
+
+def get_rid_of_number(queries):
+    ordered_queries_dict = collections.OrderedDict()
+    for i in range(0, len(queries)):
+        cnt = len(str(i+1))
+        ordered_queries_dict[queries[i][:cnt]] = queries[i][cnt+1:]
+    return ordered_queries_dict
+
+def lst_queries(queries):
+    queries_lst = []
+    for i in range(0, len(queries)):
+        cnt = len(str(i+1))
+        queries_lst.append(queries[i][cnt+1:-1])
+    return queries_lst
+
+"""
+    Classifying Queries
+"""
 def is_single_query(query):
     query = query.lower()
     lst_words = query.split(' ')
@@ -131,6 +173,152 @@ def is_proximity(query):
     if query[0] == '#':
         return True
 
+def is_NOT(query):
+    query = query.lower()
+    lst_words = query.split(' ')
+    for word in lst_words:
+        if word == 'not':
+            return True
+    return False
+
+"""
+    Preparing Queries
+"""
+def prepare_phrase(phrase):
+    phrase = re.split('[^a-zA-Z0-9]+', phrase)
+    phrase = [elem for elem in phrase if elem != '']
+    return phrase
+
+def prepare_proximity(proximity):
+    triple = re.split('[^a-zA-Z0-9]+', proximity)
+    triple = [elem for elem in triple if elem != '']
+    return triple
+
+def is_AND(compound_query):
+    compound_query = compound_query.lower()
+    compound_query = compound_query.split(' ')
+    for word in compound_query:
+        if word == 'and':
+            return True
+
+def is_OR(compound_query):
+    compound_query = compound_query.lower()
+    compound_query = compound_query.split(' ')
+    for word in compound_query:
+        if word == 'or':
+            return True
+
+def prepare_compound_queries(compound_query):
+    compound_query = compound_query.lower()
+    flag_AND = is_AND(compound_query)
+    flag_OR = is_OR(compound_query)
+    if flag_AND:
+        query = re.split(' and ', compound_query)
+        query = [elem for elem in query if is_word(elem)]
+        query = [query[0], 'and', query[1]]
+        return query
+    elif flag_OR:
+        query = re.split(' or ', compound_query)
+        query = [elem for elem in query if is_word(elem)]
+        query = [query[0], 'or', query[1]]
+        return query
+
+"""
+    Search for Queries
+"""
+def search_files_word(word, system):
+    # search for word in the system
+    files = []
+    if word in list(system.keys()):
+        files = get_files(system.get(word))
+    files = [file[0] for file in files]
+    return files
+
+def search_files_phrase(phrase, system):
+    word1 = phrase[0]
+    files_word1 = []
+    if word1 in list(system.keys()):
+        files_word1 = get_files(system.get(word1))
+    word2 = phrase[1]
+    files_word2 = []
+    if word2 in list(system.keys()):
+        files_word2 = get_files(system.get(word2))
+    # compare the lists
+    results = []
+    if len(files_word1) != 0 and len(files_word2) != 0:
+        for doc1 in files_word1:
+            for doc2 in files_word2:
+                if doc1[0] == doc2[0] and doc1[1] + 1 == doc2[1]:
+                    results.append(doc1[0])
+    return results
+
+def search_files_proximity(proximity, system):
+    proximity_indicator = int(proximity[0])
+    word1 = proximity[1]
+    files_word1 = []
+    if word1 in list(system.keys()):
+        files_word1 = get_files(system.get(word1))
+    word2 = proximity[2]
+    files_word2 = []
+    if word2 in list(system.keys()):
+        files_word2 = get_files(system.get(word2))
+    # compare the lists
+    results = []
+    if len(files_word1) != 0 and len(files_word2) != 0:
+        for doc1 in files_word1:
+            for doc2 in files_word2:
+                if doc1[0] == doc2[0] and abs(doc1[1] - doc2[1]) <= proximity_indicator:
+                    results.append(doc1[0])
+    return results
+
+"""
+    Get Results for Queries
+"""
+def get_result(query,system):
+    flag_phrase = len(query) == 2
+    flag_proximity = len(query) == 3
+    flag_word = False
+    if flag_phrase:
+        phrase = query
+        result = search_files_phrase(phrase,system)
+        return result
+    elif flag_proximity:
+        proximity = query
+        result = search_files_proximity(proximity,system)
+        return result
+    else:
+        flag_word = True
+        word = query
+        result = search_files_word(word,system)
+        return result
+
+def get_intersection(query1_result,query2_result):
+    intersection = set(query1_result).intersection(set(query2_result))
+    return intersection
+
+def get_union(query1_result,query2_result):
+    union = set(query1_result).union(set(query2_result))
+    return union
+
+def compound_query_results(compound_query_prepared,system):
+    flag_AND = compound_query_prepared[1] == 'and'
+    flag_OR = compound_query_prepared[1] == 'or'
+
+    if flag_AND:
+        query1_result = get_result(compound_query_prepared[0],system)
+        query2_result = get_result(compound_query_prepared[2],system)
+        result = get_intersection(query1_result,query2_result)
+    elif flag_OR:
+        query1_result = get_result(compound_query_prepared[0],system)
+        query2_result = get_result(compound_query_prepared[2],system)
+        result = get_union(query1_result,query2_result)
+    else:
+        result = []
+    return result
+
+"""
+    Execute Query
+"""
 def execute_query(query,system):
     # check is it is a singular or a compound query
     single_query = is_single_query(query)
@@ -155,6 +343,17 @@ def execute_query(query,system):
         return comp_query_result
 
 
+def process_querries(file_name,system):
+    queries = read_bool_queries(file_name)
+    queries = [preprocess(query) for query in lst_queries(queries)]
+    results = [execute_query(query,system) for query in queries]
+    return results
+
+def generate_output_queries(queries_results):
+    output = open("results.boolean.txt", "w+")
+    for i in range(0,len(queries_results)):
+        for sub_result in queries_results[i]:
+            output.write(str(i) + ',' + str(sub_result) + '\n')
 
 
 def main(name_of_file):
@@ -167,6 +366,14 @@ def main(name_of_file):
     print('Indexing...')
     index = indexing(documents)
     generate_index_file(index)
+
+    print(index)
+
+    print('Output successfully generated!')
+    print('The indexed documentation of the files can be found in index.txt')
+
+    results = process_querries('queries.boolean.txt', index)
+    generate_output_queries(results)
 
 main('trec.5000.xml')
 

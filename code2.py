@@ -132,6 +132,18 @@ def docID_docPosition(word_values):
         format_lst = [[id_num, pos] for pos in pos_lst]
         format.append(format_lst)
     return format
+def get_document_ids(index):
+    document_ids = set()
+    for word in index:
+        for doc_id in word:
+            document_ids.add(doc_id)
+    return document_ids
+def remove_not(query):
+    query = query.lower().split(' ')
+    query.remove('not')
+    print(query)
+    return query
+
 """
     Parsing & Preprocessing Queries
 """
@@ -324,18 +336,36 @@ def execute_query(query,system):
     single_query = is_single_query(query)
     # Singular:
     if single_query:
-        if is_phrase(query):
-            phrase_prepared = prepare_phrase(query)
-            phrase_result = search_files_phrase(phrase_prepared,system)
-            return phrase_result
-        elif is_proximity(query):
-            proximity_prepared = prepare_proximity(query)
-            proximity_result = search_files_proximity(proximity_prepared, system)
-            return proximity_result
+        # check if query is negated with NOT
+        if is_NOT(query):
+            document_ids = get_document_ids(system)
+            print(document_ids)
+            query = remove_not(query)
+            if is_phrase(query):
+                phrase_prepared = prepare_phrase(query)
+                phrase_result = document_ids - set(search_files_phrase(phrase_prepared,system))
+                return list(phrase_result)
+            elif is_proximity(query):
+                proximity_prepared = prepare_proximity(query)
+                proximity_result = document_ids - set(search_files_proximity(proximity_prepared, system))
+                return list(proximity_result)
+            else:
+                word_prepared = query
+                word_results = document_ids - set(search_files_word(word_prepared, system))
+                return list(word_results)
         else:
-            word_prepared = query
-            word_results = search_files_word(word_prepared, system)
-            return word_results
+            if is_phrase(query):
+                phrase_prepared = prepare_phrase(query)
+                phrase_result = search_files_phrase(phrase_prepared,system)
+                return phrase_result
+            elif is_proximity(query):
+                proximity_prepared = prepare_proximity(query)
+                proximity_result = search_files_proximity(proximity_prepared, system)
+                return proximity_result
+            else:
+                word_prepared = query
+                word_results = search_files_word(word_prepared, system)
+                return word_results
     # Compound:
     else:
         prepared_compound_query = prepare_compound_queries(query)
@@ -345,12 +375,13 @@ def execute_query(query,system):
 
 def process_querries(file_name,system):
     queries = read_bool_queries(file_name)
-    queries = [preprocess(query) for query in lst_queries(queries)]
+    queries = [stemming(tokenisation(numbers(case_folding(query)))) for query in lst_queries(queries)]
+    print(queries)
     results = [execute_query(query,system) for query in queries]
     return results
 
 def generate_output_queries(queries_results):
-    output = open("results.boolean.txt", "w+")
+    output = open("results.boolean2.txt", "w+")
     for i in range(0,len(queries_results)):
         for sub_result in queries_results[i]:
             output.write(str(i) + ',' + str(sub_result) + '\n')

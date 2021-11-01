@@ -123,6 +123,14 @@ def is_single_query(query):
             return False
     return True
 
+def is_phrase(query):
+    if query[0] == '"':
+        return True
+
+def is_proximity(query):
+    if query[0] == '#':
+        return True
+
 def execute_query(query,system):
     # check is it is a singular or a compound query
     single_query = is_single_query(query)

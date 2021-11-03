@@ -1,1 +1,1 @@
-1 NOT Happiness
+1 NOT #5(mining,operations) AND NOT "consolidated gold"

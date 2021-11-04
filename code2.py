@@ -1,18 +1,44 @@
-import string
 import xml.etree.ElementTree as ET
 import collections
 from nltk.stem import PorterStemmer
-import pandas as pd
 import re
+import math
 
 
-# TASK 1: is to preprocess the data as it was done in lab 1
-    # Be sure that you have your preprocessing module ready (revise: lab 1), then apply it to the collections.
-    # if you didn't have it done, then at least get the tokeniser and casefolding ready for this lab
+"""
+    The following file is my Information Retrieval System :)
+    
+    For the purpouses of easier understanding of my code, I have divided the document into three
+    components, based on the functionalities we needed to implement:
+    
+        1. Preprocessing - includes the methods responsible for preprocessing the text data
+        2. Indexing - includes the methods for generating the index
+        3. Boolean Querying - includes the methods responsible for preparation as well as 
+           the execution of the boolean search queries.
+        4. Ranked Querying - includes the methods responsible for preparation as well as 
+           the execution of the ranked search queries.
+        5. Brain - contains the Main() method, which controls the operation of the whole 
+           IR system by calling all of the sub-components.
+"""
 
-#========================================================
-# TOKENISATION
-#========================================================
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                       1. PREPROCESSING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+    This is the main preprocessing method, which calls all other 
+    methods in this sub-component.
+"""
+def preprocess(text):
+    text = stemming(stop_words(tokenisation(text)))
+    return text
+"""
+---------------------    
+    TOKENISATION
+---------------------    
+"""
 """
     Case Folding
 """
@@ -43,9 +69,11 @@ def tokenisation(sentance):
         sentance_list_new.append(word_new)
     return ' '.join(sentance_list_new)
 
-#========================================================
-# STOPWORDS REMOVAL
-#========================================================
+"""
+--------------------------    
+    STOPWORD REMOVAL
+--------------------------
+"""
 def stop_words(sentance):
     stop_words = open("stop-words.txt", "r").read()
     stop_words = set(stop_words.split('\n'))
@@ -59,38 +87,33 @@ def stop_words(sentance):
     sentance = ' '.join(clean_sentance_lst)
     return sentance
 
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# STEMMING
-#===========================================================================
+"""
+------------------
+    STEMMING
+------------------ 
+"""
 def stemming(sentance):
     ps = PorterStemmer()
     sentance_lst = sentance.split()
     sentance = ' '.join([ps.stem(x) for x in sentance_lst])
     return sentance
 
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# PREPROCESS - CONTAINS ALL METHODS
-#===========================================================================
-def preprocess(text):
-    text = stemming(stop_words(tokenisation(text)))
-    return text
 
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# INDEXING
-# *******************************************
+#          *******************************************
+#                         2. INDEXING
+#          *******************************************
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def document_analysis(tree):
     documents = [(document.find('DOCNO').text, preprocess(document.find('HEADLINE').text + document.find('TEXT').text).split(' '))
                  for document in tree.iter("DOC")]
     return documents
+
+def document_analysis_dict(documents):
+    docs_dict = {}
+    for doc in documents:
+        docs_dict[doc[0]] = doc[1]
+    return docs_dict
 
 def indexing(documents):
     index = {}
@@ -112,18 +135,18 @@ def generate_index_file(index):
         output.write(word+':'+str(len(index[word]))+'\n')
         for occurance in index[word]:
             output.write('\t'+occurance+':'+','.join([str(elem) for elem in index[word][occurance]])+'\n')
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                    3. BOOLEAN QUERYING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
     Helper Functions
 """
 def get_files(dict_docs):
-    print('*****')
-    print(dict_docs)
-    print('*****')
     files = flatten1(docID_docPosition(dict_docs))
-    print(files)
     return files
 def flatten1(t):
     return [item for sublist in t for item in sublist]
@@ -403,8 +426,7 @@ def execute_query(query,system):
         comp_query_result = list(compound_query_results(prepared_compound_query,system))
         return comp_query_result
 
-
-def process_querries(file_name,system):
+def process_bool_querries(file_name, system):
     queries = read_bool_queries(file_name)
     print('\nQueries: ')
     print(queries)
@@ -415,11 +437,93 @@ def process_querries(file_name,system):
     return results
 
 def generate_output_queries(queries_results):
-    output = open("results.boolean2.txt", "w+")
+    output = open("results.boolean.txt", "w+")
     for i in range(0,len(queries_results)):
         for sub_result in queries_results[i]:
             output.write(str(i+1) + ',' + str(sub_result) + '\n')
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                    4. RANKED QUERYING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def read_ranked_queries(file_name):
+    file_queries = open(file_name, 'r')
+    ranked_queries = lst_queries(file_queries.readlines())
+    ranked_queries_preprocessed = [stemming(tokenisation(stop_words(numbers(case_folding(query))))) for query in ranked_queries]
+    return ranked_queries_preprocessed
+
+def process_ranked_queries(file_name, index, docs_dict):
+    queries = read_ranked_queries(file_name)
+    number_of_all_docs = len(docs_dict.keys())
+    print(number_of_all_docs)
+    print(queries)
+
+    ranked_queries = [rank_query(query, number_of_all_docs, index, docs_dict) for query in queries]
+    print(ranked_queries)
+    generate_output_ranked_queries(ranked_queries)
+
+
+def rank_query(query, number_of_all_docs, index, docs_dict):
+    n = number_of_all_docs
+    # words in query
+    query = query.split(' ')
+    # all relevant docs
+    lst_docs = [list(search_files_word(word,index)) for word in query]
+    lst_docs = [doc for sub in lst_docs for doc in sub]
+    # dictionary (word, df)
+    dict_inv_df = {}
+    for word in query:
+        if index.get(word) == None:
+            print(word)
+            dict_inv_df[word] = 0
+        else:
+            dict_inv_df[word] = math.log(n / len(index.get(word)),10)
+
+    print(dict_inv_df)
+    lst_docs_scores = []
+    for doc in lst_docs:
+        tuple_doc_score = get_query_score(doc,query,dict_inv_df,docs_dict)
+        lst_docs_scores.append(tuple_doc_score)
+    lst_docs_scores.sort()
+    if len(lst_docs_scores) > 150:
+        lst_docs_scores = lst_docs_scores[:150]
+    return  lst_docs_scores
+
+
+def get_query_score(document,query,dict_inv_df,docs_dict):
+    score = round(sum([w_term_doc_score(term,document,dict_inv_df,docs_dict) for term in query]),4)
+    return (score,document)
+
+
+def w_term_doc_score(term,document,dict_inv_df,docs_dict):
+    inv_df = dict_inv_df[term]
+    tf = get_term_frequncy(term,document,docs_dict)
+    result = tf*inv_df
+    return result
+
+
+def get_term_frequncy(term,document,docs_dict):
+    doc = docs_dict[str(document)]
+    tf = sum([1 for word in doc if word == term])
+    result_tf = 1
+    if tf != 0:
+        result_tf = 1 + math.log(tf,10)
+    return result_tf
+
+def generate_output_ranked_queries(ranked_queries):
+    output = open("results.ranked.txt", "w+")
+    for i in range(0,len(ranked_queries)):
+        for article in ranked_queries[i]:
+            output.write(str(i+1)+','+str(article[1])+','+str(article[0])+'\n')
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                          5. BRAIN
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def main(name_of_file):
     print('Parsing the XML tree file...')
@@ -427,6 +531,7 @@ def main(name_of_file):
 
     print('Preprocessing the data...')
     documents = document_analysis(tree)
+    docs_dict = document_analysis_dict(documents)
 
     print('Indexing...')
     index = indexing(documents)
@@ -438,8 +543,18 @@ def main(name_of_file):
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    results = process_querries('queries.boolean.txt', index)
-    generate_output_queries(results)
+    # print('\nProcessing Boolean Queries...')
+    # results = process_bool_querries('queries.boolean.txt', index)
+    # generate_output_queries(results)
+    # print('Output successfully generated!')
+    # print('Results for Boolean Quries can be found in results.boolean.txt')
+
+    print('\nProcessing Ranked Queries...')
+    process_ranked_queries('queries.ranked.test.txt',index, docs_dict)
+
+    print('\n')
+    print(documents)
+    print(docs_dict)
 
 main('trec.sample.xml')
 

@@ -273,7 +273,9 @@ def search_files_word(word, index):
     files = set()
     # safety check that the word is in my vocab
     if word in list(index.keys()):
+        print(word)
         rtrn = get_files(index.get(word))
+        print(rtrn)
         for elem in rtrn:
             files.add(elem[0])
     return files
@@ -289,12 +291,12 @@ def search_files_phrase(phrase, system):
     if word2 in list(system.keys()):
         files_word2 = get_files(system.get(word2))
     # compare the lists
-    results = []
+    results = set()
     if len(files_word1) != 0 and len(files_word2) != 0:
         for doc1 in files_word1:
             for doc2 in files_word2:
                 if doc1[0] == doc2[0] and doc1[1] + 1 == doc2[1]:
-                    results.append(doc1[0])
+                    results.add(doc1[0])
     return results
 
 def search_files_proximity(proximity, system):
@@ -394,7 +396,7 @@ def process_bool_querries(file_name, system):
 def generate_output_queries(queries_results):
     output = open("results.boolean.txt", "w+")
     for i in range(0,len(queries_results)):
-        for sub_result in queries_results[i]:
+        for sub_result in sorted(set(queries_results[i])):
             output.write(str(i+1) + ',' + str(sub_result) + '\n')
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -416,14 +418,13 @@ def process_ranked_queries(file_name, index, docs_dict):
     ranked_queries = [rank_query(query, number_of_all_docs, index, docs_dict) for query in queries]
     generate_output_ranked_queries(ranked_queries)
 
-
 def rank_query(query, number_of_all_docs, index, docs_dict):
     n = number_of_all_docs
     # words in query
     query = query.split(' ')
     # all relevant docs
     lst_docs = [list(search_files_word(word,index)) for word in query]
-    lst_docs = [doc for sub in lst_docs for doc in sub]
+    lst_docs = set([doc for sub in lst_docs for doc in sub])
     # dictionary (word, df)
     dict_inv_df = {}
     for word in query:
@@ -441,18 +442,15 @@ def rank_query(query, number_of_all_docs, index, docs_dict):
         lst_docs_scores = lst_docs_scores[:150]
     return  lst_docs_scores
 
-
 def get_query_score(document,query,dict_inv_df,docs_dict):
     score = round(sum([w_term_doc_score(term,document,dict_inv_df,docs_dict) for term in query]),4)
     return (score,document)
-
 
 def w_term_doc_score(term,document,dict_inv_df,docs_dict):
     inv_df = dict_inv_df[term]
     tf = get_term_frequncy(term,document,docs_dict)
     result = tf*inv_df
     return result
-
 
 def get_term_frequncy(term,document,docs_dict):
     doc = docs_dict[str(document)]
@@ -493,14 +491,14 @@ def main(name_of_file):
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    print('\nProcessing Boolean Queries...')
-    results = process_bool_querries('queries.boolean.txt', index)
-    results = [sorted(query_results) for query_results in results]
-    print('**********')
-    print(len(results))
-    generate_output_queries(results)
-    print('Output successfully generated!')
-    print('Results for Boolean Quries can be found in results.boolean.txt')
+    # print('\nProcessing Boolean Queries...')
+    # results = process_bool_querries('queries.boolean.txt', index)
+    # results = [sorted(query_results) for query_results in results]
+    # print('**********')
+    # print(len(results))
+    # generate_output_queries(results)
+    # print('Output successfully generated!')
+    # print('Results for Boolean Quries can be found in results.boolean.txt')
 
     print('\nProcessing Ranked Queries...')
     process_ranked_queries('queries.ranked.txt',index, docs_dict)

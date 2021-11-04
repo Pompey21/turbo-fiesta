@@ -1,18 +1,44 @@
-import string
 import xml.etree.ElementTree as ET
 import collections
 from nltk.stem import PorterStemmer
-import pandas as pd
 import re
+import math
 
 
-# TASK 1: is to preprocess the data as it was done in lab 1
-    # Be sure that you have your preprocessing module ready (revise: lab 1), then apply it to the collections.
-    # if you didn't have it done, then at least get the tokeniser and casefolding ready for this lab
+"""
+    The following file is my Information Retrieval System :)
+    
+    For the purpouses of easier understanding of my code, I have divided the document into three
+    components, based on the functionalities we needed to implement:
+    
+        1. Preprocessing - includes the methods responsible for preprocessing the text data
+        2. Indexing - includes the methods for generating the index
+        3. Boolean Querying - includes the methods responsible for preparation as well as 
+           the execution of the boolean search queries.
+        4. Ranked Querying - includes the methods responsible for preparation as well as 
+           the execution of the ranked search queries.
+        5. Brain - contains the Main() method, which controls the operation of the whole 
+           IR system by calling all of the sub-components.
+"""
 
-#========================================================
-# TOKENISATION
-#========================================================
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                       1. PREPROCESSING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
+    This is the main preprocessing method, which calls all other 
+    methods in this sub-component.
+"""
+def preprocess(text):
+    text = stemming(stop_words(tokenisation(text)))
+    return text
+"""
+---------------------    
+    TOKENISATION
+---------------------    
+"""
 """
     Case Folding
 """
@@ -43,9 +69,11 @@ def tokenisation(sentance):
         sentance_list_new.append(word_new)
     return ' '.join(sentance_list_new)
 
-#========================================================
-# STOPWORDS REMOVAL
-#========================================================
+"""
+--------------------------    
+    STOPWORD REMOVAL
+--------------------------
+"""
 def stop_words(sentance):
     stop_words = open("stop-words.txt", "r").read()
     stop_words = set(stop_words.split('\n'))
@@ -59,270 +87,96 @@ def stop_words(sentance):
     sentance = ' '.join(clean_sentance_lst)
     return sentance
 
-#-----------------
-# Test zone
-#-----------------
-# test1 = 'Life is about love'
-# result1 = stop_words(test1)
-# print(result1)
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# STEMMING
-#===========================================================================
+"""
+------------------
+    STEMMING
+------------------ 
+"""
 def stemming(sentance):
     ps = PorterStemmer()
     sentance_lst = sentance.split()
     sentance = ' '.join([ps.stem(x) for x in sentance_lst])
     return sentance
 
-#-----------------
-# Test zone
-#-----------------
-# test1 = 'Life is about love'
-# result1 = stemming(test1)
-# print(result1)
 
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# PREPROCESS - CONTAINS ALL METHODS
-#===========================================================================
-def preprocess(tree):
-    for elem in tree.iter():
-        if elem.tag == 'DOC':
-            children = list(elem)
-            for child in children:
-                flag = False
-                if child.tag == 'HEADLINE':
-                    # TOKENIZATION
-                    child.text = tokenisation(child.text)
-                    # STOP-WORDS
-                    child.text = stop_words(child.text)
-                    # STEMMING
-                    child.text = stemming(child.text)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                         2. INDEXING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def document_analysis(tree):
+    documents = [(document.find('DOCNO').text, preprocess(document.find('HEADLINE').text + document.find('TEXT').text).split(' '))
+                 for document in tree.iter("DOC")]
+    return documents
 
-                    # this will be added to the body (text) of the document
-                    transporter = child.text
-                    flag = True
-                if child.tag == 'TEXT':
-                    # TOKENIZATION
-                    child.text = tokenisation(child.text)
-                    # STOP-WORDS
-                    child.text = stop_words(child.text)
-                    # STEMMING
-                    child.text = stemming(child.text)
+def document_analysis_dict(documents):
+    docs_dict = {}
+    for doc in documents:
+        docs_dict[doc[0]] = doc[1]
+    return docs_dict
 
-                # adding the headlines to the body of the text
-                    if flag == True:
-                        child.text = transporter + child.text
-                    # print(child.text)
-    return tree
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# INDEXING
-#===========================================================================
+def indexing(documents):
+    index = {}
+    for document in documents:
+        for (ind,word) in enumerate(document[1]):
+            if word not in index:
+                index.update({word : {document[0] : [ind]}})
+            else:
+                if document[0] not in index[word]:
+                    index[word][document[0]] = [ind]
+                else:
+                    index[word][document[0]].append(ind)
+    index = collections.OrderedDict(sorted(index.items()))
+    return index
+
+def generate_index_file(index):
+    output = open("index.txt","w+")
+    for word in index:
+        output.write(word+':'+str(len(index[word]))+'\n')
+        for occurance in index[word]:
+            output.write('\t'+occurance+':'+','.join([str(elem) for elem in index[word][occurance]])+'\n')
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                    3. BOOLEAN QUERYING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 """
-    Indexing - Basic => each document
+    Helper Functions
 """
-def vocab_generator(tree):
-    vocabulary = set()
-    for elem in tree.iter():
-        if elem.tag == 'DOC':
-            children = list(elem)
-            for child in children:
-                if child.tag == 'TEXT':
-                    words = child.text.split()
-                    for word in words:
-                        vocabulary.add(word)
-    return vocabulary
-
-# generating vector indicating whether the word occurs
-# in the given document or not
-def doc_vectors(child_text, vocabulary):
-    vector = dict.fromkeys(vocabulary, 0)
-    words = child_text.split()
-    for word in words:
-        vector[word] += 1
-    return list(vector.values())
-
-# learning the position of words within the document
-def doc_word_positions(child_text, vocabulary):
-    word_position = {v: [] for v in vocabulary}
-    words = child_text.split()
-
-    for i, word in enumerate(words):
-        word_pos = word_position[word]
-        word_pos.append(i)
-        word_position[word] = word_pos
-
-    return word_position
-
-#===========================================================================
-# POSTING
-#===========================================================================
-# create a dictionary, where every word in a vocab. is linked
-# to a list with DocIDs which contain that word!
-#
-def invert_index_sparse_rep(df):
-    invert_indices = dict.fromkeys(list(df.columns),[])
-    # print(invert_indices)
-    for (columnName, columnData) in df.iteritems():
-        # print('Colunm Name : ', columnName)
-        # print('Column Contents : ', columnData.values)
-
-        indices = []
-        for i in range(0,len(columnData.values)):
-            if columnData.values[i] != 0:
-                docID_wordFreq = [i,columnData.values[i]]
-                indices.append(docID_wordFreq)
-        invert_indices[columnName] = indices
-        # print(indices)
-    return invert_indices
-
-def invert_index_advanced(invert_indices, child_text, vocabulary):
-    # this is a dictionary for easier search
-    doc_word_pos = [doc_word_positions(text, vocabulary) for text in child_text]
-    new_invert_indices = {v: [] for v in vocabulary}
-
-    for index in invert_indices:
-        for tuple in invert_indices[index]:
-            docID = tuple[0]
-            formation2 = [[docID, x] for x in doc_word_pos[docID].get(index)]
-            new_invert_indices[index].append(formation2)
-
-    return new_invert_indices
-
-def dictionary_generator(new_invert_indices, number_of_docs):
-    new_system = {word: [] for word in new_invert_indices.keys()}
-    system = new_invert_indices
-    for word in system:
-        document_ID = {'docID-' + str(i): [] for i in range(0,number_of_docs)}
-        for doc in system.get(word):
-            docID = doc[0][0]
-            positions = [position[1] for position in doc]
-            key1 = 'docID-'+str(docID)
-            document_ID[key1] = (positions)
-        new_system[word] = document_ID
-    return new_system
-
-def master_indexing(tree):
-    #vocabulary generator
-    vocabulary = vocab_generator(tree)
-    # print(vocabulary)
-
-    #get texts of all children in a tree
-    child_text = []
-    for elem in tree.iter():
-        if elem.tag == 'DOC':
-            children = list(elem)
-            for child in children:
-                if child.tag == 'TEXT':
-                    child_text.append(child.text)
-
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    # Putting every Document into Vector Representation
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    child_text_index = [doc_vectors(text, vocabulary) for text in child_text]
-
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    # Formatting the Pandas DataFrame
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    rows = []
-    for i in range(1, len(child_text_index) + 1):
-        doc = 'D' + str(i)
-        rows.append(doc)
-    df = pd.DataFrame.from_records(child_text_index)
-    df.columns = list(vocabulary)
-    df.index = rows
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    # Generating Inverted Indices - with Doc Frequency
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    invert_indices = invert_index_sparse_rep(df)
-
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    # Generating Inverted Indices - with Doc Frequency
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    word_location_document = invert_index_advanced(invert_indices, child_text, vocabulary)
-
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    # Generating Inverted Indices - with Doc Positions
-    # --^--^--^--^--^--^--^--^--^--^--^--^--^--^--^--^
-    system = dictionary_generator(word_location_document, len(child_text_index))
-
-
-    return system
-
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# OUTPUT GENERATOR
-#===========================================================================
-def document_frequency(word_values):
-    docs = word_values.keys()
-    df = [1 for doc in docs if len(word_values.get(doc))>0]
-    return sum(df)
-
-def parse_doc_name(docName: str):
-    id = docName[6:]
-    return id
-
+def get_files(dict_docs):
+    files = flatten1(docID_docPosition(dict_docs))
+    return files
+def flatten1(t):
+    return [item for sublist in t for item in sublist]
 def docID_docPosition(word_values):
     docIDs = word_values.keys()
     format = []
     for id in docIDs:
-        id_num = int(parse_doc_name(id))
+        id_num = int(id)
         pos_lst = word_values.get(id)
         format_lst = [[id_num, pos] for pos in pos_lst]
         format.append(format_lst)
     return format
+def get_document_ids(index):
+    document_ids = set()
+    for word in index:
+        for doc_id in index[word]:
+            document_ids.add(int(doc_id))
+    return document_ids
+def remove_not(query):
+    query = query.lower().split(' ')
+    query.remove('not')
+    return " ".join(query)
+def is_word(elem):
+    for char in elem:
+        if char.isalpha():
+            return True
 
-def sort_alphabetically(system):
-    ordered = collections.OrderedDict(sorted(system.items()))
-    return ordered
-
-def generate_output_index(system):
-    system = sort_alphabetically(system)
-    output = open("index.txt", "w+")
-    head = list(system.keys())[0]
-    for word in system:
-        if word != head:
-            output.write('\n')
-        df = document_frequency(system.get(word))
-        format_lst = docID_docPosition(system.get(word))
-        output.write(word)
-        output.write(':')
-        output.write(str(df))
-
-        # print('Word: {}'.format(word))
-        # print(format_lst)
-        for j in range(0,len(format_lst)):
-            if len(format_lst[j]) != 0:
-                output.write('\n')
-                output.write('\t')
-                output.write(str(format_lst[j][0][0]))
-                output.write(': ')
-                for i in range(0,len(format_lst[j])):
-                    output.write(str(format_lst[j][i][1]))
-                    if i != len(format_lst[j])-1:
-                        output.write(',')
-
-
-#===========================================================================
-# QUERY PROCESSING
-#===========================================================================
-# --------------------------------------------------------------------------
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Boolean Search
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# parsing the boolean queries
+"""
+    Parsing & Preprocessing Queries
+"""
 def read_bool_queries(file_name):
     file_queries = open(file_name, 'r')
     bool_queries = file_queries.readlines()
@@ -341,14 +195,10 @@ def lst_queries(queries):
         cnt = len(str(i+1))
         queries_lst.append(queries[i][cnt+1:-1])
     return queries_lst
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Classifying Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+"""
+    Classifying Queries
+"""
 def is_single_query(query):
     query = query.lower()
     lst_words = query.split(' ')
@@ -365,103 +215,98 @@ def is_proximity(query):
     if query[0] == '#':
         return True
 
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Preparing Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def is_NOT(query):
+    query = query.lower()
+    lst_words = query.split(' ')
+    for word in lst_words:
+        if word == 'not':
+            return True
+    return False
+
+"""
+    Preparing Queries
+"""
 def prepare_phrase(phrase):
     phrase = re.split('[^a-zA-Z0-9]+', phrase)
-    phrase = [elem for elem in phrase if elem != '']
+    phrase = [stemming(tokenisation(numbers(case_folding(elem)))) for elem in phrase if elem != '']
     return phrase
 
 def prepare_proximity(proximity):
     triple = re.split('[^a-zA-Z0-9]+', proximity)
     triple = [elem for elem in triple if elem != '']
-    print(triple)
+    triple[1] = stemming(tokenisation(case_folding(triple[1])))
+    triple[2] = stemming(tokenisation(case_folding(triple[2])))
     return triple
 
 def is_AND(compound_query):
-    compound_query = compound_query.lower()
     compound_query = compound_query.split(' ')
     for word in compound_query:
-        if word == 'and':
+        if word == 'AND':
             return True
 
 def is_OR(compound_query):
-    compound_query = compound_query.lower()
     compound_query = compound_query.split(' ')
     for word in compound_query:
-        if word == 'or':
+        if word == 'OR':
             return True
 
 def prepare_compound_queries(compound_query):
-    compound_query = compound_query.lower()
+    # compound_query = compound_query.lower()
     flag_AND = is_AND(compound_query)
     flag_OR = is_OR(compound_query)
     if flag_AND:
-        query = re.split(' and ', compound_query)
+        query = re.split(' AND ', compound_query)
         query = [elem for elem in query if is_word(elem)]
-        query = [query[0], 'and', query[1]]
+        query = [query[0], 'AND', query[1]]
         return query
     elif flag_OR:
-        query = re.split(' or ', compound_query)
+        query = re.split(' OR ', compound_query)
         query = [elem for elem in query if is_word(elem)]
-        query = [query[0], 'or', query[1]]
+        query = [query[0], 'OR', query[1]]
         return query
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Search Files for Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def search_files_word(word,system):
+
+"""
+    Search for Queries
+"""
+def search_files_word(word, index):
     # search for word in the system
-    files = []
-    if word in list(system.keys()):
-        files = get_files(system.get(word))
-    files = [file[0] for file in files]
-    print('~~~~~~~~~')
-    print(files)
+    files = set()
+    # safety check that the word is in my vocab
+    if word in list(index.keys()):
+        rtrn = get_files(index.get(word))
+        for elem in rtrn:
+            files.add(elem[0])
     return files
 
-def search_files_phrase(phrase,system):
+def search_files_phrase(phrase, system):
     word1 = phrase[0]
     files_word1 = []
     if word1 in list(system.keys()):
         files_word1 = get_files(system.get(word1))
-    print('Files for word1: {}'.format(files_word1))
+        print(files_word1)
     word2 = phrase[1]
     files_word2 = []
     if word2 in list(system.keys()):
         files_word2 = get_files(system.get(word2))
-    print('Files for word2: {}'.format(files_word2))
     # compare the lists
     results = []
-    if len(files_word1)!=0 and len(files_word2)!=0:
+    if len(files_word1) != 0 and len(files_word2) != 0:
         for doc1 in files_word1:
             for doc2 in files_word2:
-                if doc1[0] == doc2[0] and doc1[1]+1 == doc2[1]:
+                if doc1[0] == doc2[0] and doc1[1] + 1 == doc2[1]:
                     results.append(doc1[0])
     return results
 
-def search_files_proximity(proximity,system):
+def search_files_proximity(proximity, system):
     proximity_indicator = int(proximity[0])
     word1 = proximity[1]
     files_word1 = []
     if word1 in list(system.keys()):
         files_word1 = get_files(system.get(word1))
-    print('Files for word1: {}'.format(files_word1))
     word2 = proximity[2]
     files_word2 = []
     if word2 in list(system.keys()):
         files_word2 = get_files(system.get(word2))
-    print('Files for word2: {}'.format(files_word2))
     # compare the lists
     results = []
     if len(files_word1) != 0 and len(files_word2) != 0:
@@ -470,48 +315,6 @@ def search_files_proximity(proximity,system):
                 if doc1[0] == doc2[0] and abs(doc1[1] - doc2[1]) <= proximity_indicator:
                     results.append(doc1[0])
     return results
-
-# ----------------------------------
-# **********************
-# Helper Functions
-# **********************
-# ----------------------------------
-def is_word(elem):
-    for char in elem:
-        if char.isalpha():
-            return True
-
-def get_files(dict_docs):
-    files = flatten1(docID_docPosition(dict_docs))
-    return files
-
-def flatten1(t):
-    return [item for sublist in t for item in sublist]
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Generate Results for Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def get_result(query,system):
-    flag_phrase = len(query) == 2
-    flag_proximity = len(query) == 3
-    flag_word = False
-    if flag_phrase:
-        phrase = query
-        result = search_files_phrase(phrase,system)
-        return result
-    elif flag_proximity:
-        proximity = query
-        result = search_files_proximity(proximity,system)
-        return result
-    else:
-        flag_word = True
-        word = query
-        result = search_files_word(word,system)
-        return result
 
 def get_intersection(query1_result,query2_result):
     intersection = set(query1_result).intersection(set(query2_result))
@@ -522,168 +325,206 @@ def get_union(query1_result,query2_result):
     return union
 
 def compound_query_results(compound_query_prepared,system):
-    flag_AND = compound_query_prepared[1] == 'and'
-    flag_OR = compound_query_prepared[1] == 'or'
+    flag_AND = compound_query_prepared[1] == 'AND'
+    flag_OR = compound_query_prepared[1] == 'OR'
 
     if flag_AND:
-        query1_result = get_result(compound_query_prepared[0],system)
-        query2_result = get_result(compound_query_prepared[2],system)
+        query1_result = execute_query(compound_query_prepared[0],system)
+        query2_result = execute_query(compound_query_prepared[2],system)
         result = get_intersection(query1_result,query2_result)
     elif flag_OR:
-        query1_result = get_result(compound_query_prepared[0],system)
-        query2_result = get_result(compound_query_prepared[2],system)
+        query1_result = execute_query(compound_query_prepared[0],system)
+        query2_result = execute_query(compound_query_prepared[2],system)
         result = get_union(query1_result,query2_result)
     else:
         result = []
     return result
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Execute Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+"""
+    Execute Query
+"""
 def execute_query(query,system):
     # check is it is a singular or a compound query
     single_query = is_single_query(query)
     # Singular:
     if single_query:
-        if is_phrase(query):
-            phrase_prepared = prepare_phrase(query)
-            phrase_result = search_files_phrase(phrase_prepared,system)
-            return phrase_result
-        elif is_proximity(query):
-            proximity_prepared = prepare_proximity(query)
-            proximity_result = search_files_proximity(proximity_prepared, system)
-            return proximity_result
+        # check if query is negated with NOT
+        if is_NOT(query):
+            document_ids = get_document_ids(system)
+            query = remove_not(query)
+            print(query)
+            if is_phrase(query):
+                phrase_prepared = prepare_phrase(query)
+                phrase_result = (document_ids - set(search_files_phrase(phrase_prepared,system)))
+                print(search_files_phrase(phrase_prepared,system))
+                return list(phrase_result)
+            elif is_proximity(query):
+                proximity_prepared = prepare_proximity(query)
+                proximity_result = (document_ids - set(search_files_proximity(proximity_prepared, system)))
+                return list(proximity_result)
+            else:
+                word_prepared = stemming(tokenisation(numbers(case_folding(query))))
+                word_results = (document_ids - search_files_word(word_prepared, system))
+                return list(word_results)
         else:
-            word_prepared = query
-            word_results = search_files_word(word_prepared, system)
-            return word_results
+            if is_phrase(query):
+                phrase_prepared = prepare_phrase(query)
+                phrase_result = search_files_phrase(phrase_prepared,system)
+                return phrase_result
+            elif is_proximity(query):
+                proximity_prepared = prepare_proximity(query)
+                proximity_result = search_files_proximity(proximity_prepared, system)
+                return proximity_result
+            else:
+                word_prepared = stemming(tokenisation(numbers(case_folding(query))))
+                word_results = search_files_word(word_prepared, system)
+                return word_results
     # Compound:
     else:
         prepared_compound_query = prepare_compound_queries(query)
         comp_query_result = list(compound_query_results(prepared_compound_query,system))
         return comp_query_result
 
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Process Queries
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def process_querries(file_name,system):
+def process_bool_querries(file_name, system):
     queries = read_bool_queries(file_name)
-    print('-------------------------------')
-    print('Printing queries: ')
-    print(queries)
-    print('-------------------------------')
-    print('Printing list of queries')
-    queries = lst_queries(queries)
-    print(queries)
-    print('-------------------------------')
-
+    queries = lst_queries(queries)#[stemming(tokenisation(numbers(case_folding(query)))) for query in lst_queries(queries)]
     results = [execute_query(query,system) for query in queries]
-    print(results)
     return results
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# *******************************************
-# Generate Output
-# *******************************************
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def generate_output_queries(queries_results):
     output = open("results.boolean.txt", "w+")
     for i in range(0,len(queries_results)):
         for sub_result in queries_results[i]:
-            output.write(str(i) + ',' + str(sub_result) + '\n')
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
-# <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+            output.write(str(i+1) + ',' + str(sub_result) + '\n')
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# --------------------------------------------------------------------------
+#          *******************************************
+#                    4. RANKED QUERYING
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def read_ranked_queries(file_name):
+    file_queries = open(file_name, 'r')
+    ranked_queries = lst_queries(file_queries.readlines())
+    ranked_queries_preprocessed = [stemming(tokenisation(stop_words(numbers(case_folding(query))))) for query in ranked_queries]
+    return ranked_queries_preprocessed
+
+def process_ranked_queries(file_name, index, docs_dict):
+    queries = read_ranked_queries(file_name)
+    number_of_all_docs = len(docs_dict.keys())
+
+    ranked_queries = [rank_query(query, number_of_all_docs, index, docs_dict) for query in queries]
+    generate_output_ranked_queries(ranked_queries)
 
 
-#===========================================================================
-#< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >--< | >
-#===========================================================================
-# MAIN
-#==========================================================================
+def rank_query(query, number_of_all_docs, index, docs_dict):
+    n = number_of_all_docs
+    # words in query
+    query = query.split(' ')
+    # all relevant docs
+    lst_docs = [list(search_files_word(word,index)) for word in query]
+    lst_docs = [doc for sub in lst_docs for doc in sub]
+    # dictionary (word, df)
+    dict_inv_df = {}
+    for word in query:
+        if index.get(word) == None:
+            dict_inv_df[word] = 0
+        else:
+            dict_inv_df[word] = math.log(n / len(index.get(word)),10)
+
+    lst_docs_scores = []
+    for doc in lst_docs:
+        tuple_doc_score = get_query_score(doc,query,dict_inv_df,docs_dict)
+        lst_docs_scores.append(tuple_doc_score)
+    lst_docs_scores.sort()
+    if len(lst_docs_scores) > 150:
+        lst_docs_scores = lst_docs_scores[:150]
+    return  lst_docs_scores
+
+
+def get_query_score(document,query,dict_inv_df,docs_dict):
+    score = round(sum([w_term_doc_score(term,document,dict_inv_df,docs_dict) for term in query]),4)
+    return (score,document)
+
+
+def w_term_doc_score(term,document,dict_inv_df,docs_dict):
+    inv_df = dict_inv_df[term]
+    tf = get_term_frequncy(term,document,docs_dict)
+    result = tf*inv_df
+    return result
+
+
+def get_term_frequncy(term,document,docs_dict):
+    doc = docs_dict[str(document)]
+    tf = sum([1 for word in doc if word == term])
+    result_tf = 1
+    if tf != 0:
+        result_tf = 1 + math.log(tf,10)
+    return result_tf
+
+def generate_output_ranked_queries(ranked_queries):
+    output = open("results.ranked.txt", "w+")
+    for i in range(0,len(ranked_queries)):
+        for article in ranked_queries[i]:
+            output.write(str(i+1)+','+str(article[1])+','+str(article[0])+'\n')
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#          *******************************************
+#                          5. BRAIN
+#          *******************************************
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def main(name_of_file):
-
     print('Parsing the XML tree file...')
     tree = ET.parse(name_of_file)
-    # ------------------
-    # Preprocess
-    # ------------------
+
     print('Preprocessing the data...')
-    tree = preprocess(tree)
+    documents = document_analysis(tree)
+    docs_dict = document_analysis_dict(documents)
 
-    print('Calculating the Indices...')
-    system = master_indexing(tree)
+    print('Indexing...')
+    index = indexing(documents)
+    generate_index_file(index)
 
-    print('Generating output:')
-    generate_output_index(system)
+    document_ids = get_document_ids(index)
+    print('\nThese are document IDs: {}\n'.format(document_ids))
 
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    results = process_querries('queries.txt',system)
+    print('\nProcessing Boolean Queries...')
+    results = process_bool_querries('queries.boolean.txt', index)
+    results = [sorted(query_results) for query_results in results]
+    print('**********')
+    print(len(results))
     generate_output_queries(results)
+    print('Output successfully generated!')
+    print('Results for Boolean Quries can be found in results.boolean.txt')
 
+    print('\nProcessing Ranked Queries...')
+    process_ranked_queries('queries.ranked.txt',index, docs_dict)
 
-    #=========================================================================
-    # SEARCHING
-    #=========================================================================
-    # words, phrases, proximities, comp_queries = preprocess_querries('queries.txt')
-    # print('Processing the queries: ')
-    # print('Compounded Queries: ')
-    # print(comp_queries)
-    # print('Words: ')
-    # print(words)
-    # print('Phrases: ')
-    # print(phrases)
-    # print('Proximities: ')
-    # print(proximities)
-    #
-    # results_words = flatten1([get_result(word,system) for word in words])
     # print('\n')
-    # print('These are the results for singular queries - words: ')
-    # print(results_words)
-    # print('\n')
-    #
-    # results_phrases = [get_result(phrase, system) for phrase in phrases]
-    # print('\n')
-    # print('These are the results for singular queries - phrases: ')
-    # print(results_phrases)
-    # print('\n')
-    #
-    # results_proximities = [get_result(proxy, system) for proxy in proximities]
-    # print('\n')
-    # print('These are the results for singular queries - proximities: ')
-    # print(results_proximities)
-    # print('\n')
-    #
-    # print('Compound queries: ')
-    # print(comp_queries)
-    # reuslts_compound_queries = [compound_query_results(comp_query, system) for comp_query in comp_queries]
-    # print('\n')
-    # print('These are the results for comp queries: ')
-    # print(reuslts_compound_queries)
-    # print('\n')
-    #
-    # print(system)
+    # print(documents)
+    # print(docs_dict)
+
+main('trec.5000.xml')
 
 
 
-main('sample.xml')
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

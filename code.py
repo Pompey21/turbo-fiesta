@@ -273,9 +273,7 @@ def search_files_word(word, index):
     files = set()
     # safety check that the word is in my vocab
     if word in list(index.keys()):
-        print(word)
         rtrn = get_files(index.get(word))
-        print(rtrn)
         for elem in rtrn:
             files.add(elem[0])
     return files
@@ -285,7 +283,6 @@ def search_files_phrase(phrase, system):
     files_word1 = []
     if word1 in list(system.keys()):
         files_word1 = get_files(system.get(word1))
-        print(files_word1)
     word2 = phrase[1]
     files_word2 = []
     if word2 in list(system.keys()):
@@ -354,11 +351,9 @@ def execute_query(query,system):
         if is_NOT(query):
             document_ids = get_document_ids(system)
             query = remove_not(query)
-            print(query)
             if is_phrase(query):
                 phrase_prepared = prepare_phrase(query)
                 phrase_result = (document_ids - set(search_files_phrase(phrase_prepared,system)))
-                print(search_files_phrase(phrase_prepared,system))
                 return list(phrase_result)
             elif is_proximity(query):
                 proximity_prepared = prepare_proximity(query)
@@ -411,20 +406,20 @@ def read_ranked_queries(file_name):
     ranked_queries_preprocessed = [stemming(tokenisation(stop_words(numbers(case_folding(query))))) for query in ranked_queries]
     return ranked_queries_preprocessed
 
-def process_ranked_queries(file_name, index, docs_dict):
+def process_ranked_queries(file_name, index, number_of_all_docs):
     queries = read_ranked_queries(file_name)
-    number_of_all_docs = len(docs_dict.keys())
 
-    ranked_queries = [rank_query(query, number_of_all_docs, index, docs_dict) for query in queries]
+    ranked_queries = [rank_query(query, number_of_all_docs, index) for query in queries]
     generate_output_ranked_queries(ranked_queries)
 
-def rank_query(query, number_of_all_docs, index, docs_dict):
+def rank_query(query, number_of_all_docs, index):
     n = number_of_all_docs
     # words in query
     query = query.split(' ')
     # all relevant docs
-    lst_docs = [list(search_files_word(word,index)) for word in query]
+    lst_docs = [(search_files_word(word,index)) for word in query]
     lst_docs = set([doc for sub in lst_docs for doc in sub])
+    print(len(lst_docs))
     # dictionary (word, df)
     dict_inv_df = {}
     for word in query:
@@ -433,32 +428,34 @@ def rank_query(query, number_of_all_docs, index, docs_dict):
         else:
             dict_inv_df[word] = math.log(n / len(index.get(word)),10)
 
-    lst_docs_scores = []
+    lst_tuple_score_docs = []
     for doc in lst_docs:
-        tuple_doc_score = get_query_score(doc,query,dict_inv_df,docs_dict)
-        lst_docs_scores.append(tuple_doc_score)
-    lst_docs_scores.sort()
-    if len(lst_docs_scores) > 150:
-        lst_docs_scores = lst_docs_scores[:150]
-    return  lst_docs_scores
+        score = 0
+        for term in query:
+            score = round(score + w_term_doc_score(term,doc,dict_inv_df,index),4)
+        lst_tuple_score_docs.append((score,doc))
 
-def get_query_score(document,query,dict_inv_df,docs_dict):
-    score = round(sum([w_term_doc_score(term,document,dict_inv_df,docs_dict) for term in query]),4)
-    return (score,document)
+    lst_tuple_score_docs = sorted(lst_tuple_score_docs, reverse=True, key = (lambda tuple: (tuple[0], -tuple[1])))
+    if len(lst_tuple_score_docs) > 150:
+        lst_tuple_score_docs = lst_tuple_score_docs[:150]
+    return lst_tuple_score_docs
 
-def w_term_doc_score(term,document,dict_inv_df,docs_dict):
+
+def w_term_doc_score(term,document,dict_inv_df,index):
     inv_df = dict_inv_df[term]
-    tf = get_term_frequncy(term,document,docs_dict)
-    result = tf*inv_df
-    return result
+    tf = get_term_frequncy(term,document,index)
+    if tf == 0:
+        return 0
+    else:
+        result = (1+math.log(tf,10))*inv_df
+        return result
 
-def get_term_frequncy(term,document,docs_dict):
-    doc = docs_dict[str(document)]
-    tf = sum([1 for word in doc if word == term])
-    result_tf = 1
-    if tf != 0:
-        result_tf = 1 + math.log(tf,10)
-    return result_tf
+def get_term_frequncy(term,document,index):
+    tf = 0
+    if term in index.keys():
+        if str(document) in index[term].keys():
+            tf = len(index[term][str(document)])
+    return tf
 
 def generate_output_ranked_queries(ranked_queries):
     output = open("results.ranked.txt", "w+")
@@ -480,13 +477,11 @@ def main(name_of_file):
     print('Preprocessing the data...')
     documents = document_analysis(tree)
     docs_dict = document_analysis_dict(documents)
+    number_of_all_documents = len(docs_dict.keys())
 
     print('Indexing...')
     index = indexing(documents)
     generate_index_file(index)
-
-    document_ids = get_document_ids(index)
-    print('\nThese are document IDs: {}\n'.format(document_ids))
 
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
@@ -501,7 +496,7 @@ def main(name_of_file):
     # print('Results for Boolean Quries can be found in results.boolean.txt')
 
     print('\nProcessing Ranked Queries...')
-    process_ranked_queries('queries.ranked.txt',index, docs_dict)
+    process_ranked_queries('queries.ranked.txt',index,number_of_all_documents)
 
     # print('\n')
     # print(documents)

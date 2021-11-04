@@ -163,13 +163,11 @@ def get_document_ids(index):
     document_ids = set()
     for word in index:
         for doc_id in index[word]:
-            # print(doc_id)
             document_ids.add(int(doc_id))
     return document_ids
 def remove_not(query):
     query = query.lower().split(' ')
     query.remove('not')
-    # print(query)
     return " ".join(query)
 def is_word(elem):
     for char in elem:
@@ -196,7 +194,6 @@ def lst_queries(queries):
     for i in range(0, len(queries)):
         cnt = len(str(i+1))
         queries_lst.append(queries[i][cnt+1:-1])
-    print(queries_lst)
     return queries_lst
 
 """
@@ -232,7 +229,6 @@ def is_NOT(query):
 def prepare_phrase(phrase):
     phrase = re.split('[^a-zA-Z0-9]+', phrase)
     phrase = [stemming(tokenisation(numbers(case_folding(elem)))) for elem in phrase if elem != '']
-    print(phrase)
     return phrase
 
 def prepare_proximity(proximity):
@@ -259,7 +255,6 @@ def prepare_compound_queries(compound_query):
     flag_AND = is_AND(compound_query)
     flag_OR = is_OR(compound_query)
     if flag_AND:
-        print('yessssssssssssssss')
         query = re.split(' AND ', compound_query)
         query = [elem for elem in query if is_word(elem)]
         query = [query[0], 'AND', query[1]]
@@ -284,7 +279,6 @@ def search_files_word(word, index):
     return files
 
 def search_files_phrase(phrase, system):
-    print('*****************************')
     word1 = phrase[0]
     files_word1 = []
     if word1 in list(system.keys()):
@@ -301,21 +295,17 @@ def search_files_phrase(phrase, system):
             for doc2 in files_word2:
                 if doc1[0] == doc2[0] and doc1[1] + 1 == doc2[1]:
                     results.append(doc1[0])
-    print('*****************************')
     return results
 
 def search_files_proximity(proximity, system):
-    print(proximity)
     proximity_indicator = int(proximity[0])
     word1 = proximity[1]
     files_word1 = []
     if word1 in list(system.keys()):
         files_word1 = get_files(system.get(word1))
-        print(files_word1)
     word2 = proximity[2]
     files_word2 = []
     if word2 in list(system.keys()):
-        print(files_word1)
         files_word2 = get_files(system.get(word2))
     # compare the lists
     results = []
@@ -339,13 +329,8 @@ def compound_query_results(compound_query_prepared,system):
     flag_OR = compound_query_prepared[1] == 'OR'
 
     if flag_AND:
-        print('got till here')
         query1_result = execute_query(compound_query_prepared[0],system)
-        print('querry1 result: ')
-        print(query1_result)
         query2_result = execute_query(compound_query_prepared[2],system)
-        print('querry2 result: ')
-        print(query2_result)
         result = get_intersection(query1_result,query2_result)
     elif flag_OR:
         query1_result = execute_query(compound_query_prepared[0],system)
@@ -365,7 +350,6 @@ def execute_query(query,system):
     if single_query:
         # check if query is negated with NOT
         if is_NOT(query):
-            print(query + ' ----------------- YES')
             document_ids = get_document_ids(system)
             query = remove_not(query)
             print(query)
@@ -373,66 +357,37 @@ def execute_query(query,system):
                 phrase_prepared = prepare_phrase(query)
                 phrase_result = (document_ids - set(search_files_phrase(phrase_prepared,system)))
                 print(search_files_phrase(phrase_prepared,system))
-                print('\nResults: ')
-                print(list(phrase_result))
-                print('\n')
                 return list(phrase_result)
             elif is_proximity(query):
-                print('%%%%%%%%')
-                print(query)
                 proximity_prepared = prepare_proximity(query)
                 proximity_result = (document_ids - set(search_files_proximity(proximity_prepared, system)))
-                print('\nResults: ')
-                print(list(proximity_result))
-                print('\n')
                 return list(proximity_result)
             else:
                 word_prepared = stemming(tokenisation(numbers(case_folding(query))))
                 word_results = (document_ids - search_files_word(word_prepared, system))
-                print('\nResults: ')
-                print(list(word_results))
-                print('\n')
                 return list(word_results)
         else:
             if is_phrase(query):
-                print(query)
                 phrase_prepared = prepare_phrase(query)
                 phrase_result = search_files_phrase(phrase_prepared,system)
-                print('\nResults: ')
-                print(list(phrase_result))
-                print('\n')
                 return phrase_result
             elif is_proximity(query):
                 proximity_prepared = prepare_proximity(query)
-                print(proximity_prepared)
                 proximity_result = search_files_proximity(proximity_prepared, system)
-                print('\nResults: ')
-                print(list(proximity_result))
-                print('\n')
                 return proximity_result
             else:
                 word_prepared = stemming(tokenisation(numbers(case_folding(query))))
                 word_results = search_files_word(word_prepared, system)
-                print('\nResults: ')
-                print(list(word_results))
-                print('\n')
                 return word_results
     # Compound:
     else:
-        print(query)
         prepared_compound_query = prepare_compound_queries(query)
-        print('@@@@@@@@@@@@@@')
-        print(prepared_compound_query)
         comp_query_result = list(compound_query_results(prepared_compound_query,system))
         return comp_query_result
 
 def process_bool_querries(file_name, system):
     queries = read_bool_queries(file_name)
-    print('\nQueries: ')
-    print(queries)
     queries = lst_queries(queries)#[stemming(tokenisation(numbers(case_folding(query)))) for query in lst_queries(queries)]
-    print('\nStemmed Queries: ')
-    print(queries)
     results = [execute_query(query,system) for query in queries]
     return results
 
@@ -457,11 +412,8 @@ def read_ranked_queries(file_name):
 def process_ranked_queries(file_name, index, docs_dict):
     queries = read_ranked_queries(file_name)
     number_of_all_docs = len(docs_dict.keys())
-    print(number_of_all_docs)
-    print(queries)
 
     ranked_queries = [rank_query(query, number_of_all_docs, index, docs_dict) for query in queries]
-    print(ranked_queries)
     generate_output_ranked_queries(ranked_queries)
 
 
@@ -476,12 +428,10 @@ def rank_query(query, number_of_all_docs, index, docs_dict):
     dict_inv_df = {}
     for word in query:
         if index.get(word) == None:
-            print(word)
             dict_inv_df[word] = 0
         else:
             dict_inv_df[word] = math.log(n / len(index.get(word)),10)
 
-    print(dict_inv_df)
     lst_docs_scores = []
     for doc in lst_docs:
         tuple_doc_score = get_query_score(doc,query,dict_inv_df,docs_dict)
@@ -543,20 +493,23 @@ def main(name_of_file):
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    # print('\nProcessing Boolean Queries...')
-    # results = process_bool_querries('queries.boolean.txt', index)
-    # generate_output_queries(results)
-    # print('Output successfully generated!')
-    # print('Results for Boolean Quries can be found in results.boolean.txt')
+    print('\nProcessing Boolean Queries...')
+    results = process_bool_querries('queries.boolean.txt', index)
+    results = [sorted(query_results) for query_results in results]
+    print('**********')
+    print(len(results))
+    generate_output_queries(results)
+    print('Output successfully generated!')
+    print('Results for Boolean Quries can be found in results.boolean.txt')
 
     print('\nProcessing Ranked Queries...')
-    process_ranked_queries('queries.ranked.test.txt',index, docs_dict)
+    process_ranked_queries('queries.ranked.txt',index, docs_dict)
 
-    print('\n')
-    print(documents)
-    print(docs_dict)
+    # print('\n')
+    # print(documents)
+    # print(docs_dict)
 
-main('trec.sample.xml')
+main('trec.5000.xml')
 
 
 

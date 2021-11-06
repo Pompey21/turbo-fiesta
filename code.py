@@ -17,7 +17,7 @@ import math
            the execution of the boolean search queries.
         4. Ranked Querying - includes the methods responsible for preparation as well as 
            the execution of the ranked search queries.
-        5. Brain - contains the Main() method, which controls the operation of the whole 
+        5. Control - contains the Main() method, which controls the operation of the whole 
            IR system by calling all of the sub-components.
 """
 
@@ -120,12 +120,12 @@ def indexing(documents):
     for document in documents:
         for (ind,word) in enumerate(document[1]):
             if word not in index:
-                index.update({word : {document[0] : [ind]}})
+                index.update({word : {document[0] : [ind+1]}})
             else:
                 if document[0] not in index[word]:
-                    index[word][document[0]] = [ind]
+                    index[word][document[0]] = [ind+1]
                 else:
-                    index[word][document[0]].append(ind)
+                    index[word][document[0]].append(ind+1)
     index = collections.OrderedDict(sorted(index.items()))
     return index
 
@@ -466,7 +466,7 @@ def generate_output_ranked_queries(ranked_queries):
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #          *******************************************
-#                          5. BRAIN
+#                          5. CONTROL
 #          *******************************************
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

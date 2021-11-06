@@ -337,7 +337,7 @@ def compound_query_results(compound_query_prepared,system):
         result = get_union(query1_result,query2_result)
     else:
         result = []
-    return result
+    return sorted(result)
 
 """
     Execute Query
@@ -486,21 +486,19 @@ def main(name_of_file):
     print('Output successfully generated!')
     print('The indexed documentation of the files can be found in index.txt')
 
-    # print('\nProcessing Boolean Queries...')
-    # results = process_bool_querries('queries.boolean.txt', index)
-    # results = [sorted(query_results) for query_results in results]
-    # print('**********')
-    # print(len(results))
-    # generate_output_queries(results)
-    # print('Output successfully generated!')
-    # print('Results for Boolean Quries can be found in results.boolean.txt')
+    print('\nProcessing Boolean Queries...')
+    results = process_bool_querries('queries.boolean.txt', index)
+    results = [sorted(query_results) for query_results in results]
+    print('**********')
+    print(len(results))
+    generate_output_queries(results)
+    print('Output successfully generated!')
+    print('Results for Boolean Quries can be found in results.boolean.txt')
 
     print('\nProcessing Ranked Queries...')
     process_ranked_queries('queries.ranked.txt',index,number_of_all_documents)
 
-    # print('\n')
-    # print(documents)
-    # print(docs_dict)
+
 
 main('trec.5000.xml')
 
